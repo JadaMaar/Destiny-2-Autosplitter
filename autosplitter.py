@@ -1,14 +1,18 @@
-import time
+import threading
+import threading as th
 import mss
 import pyautogui
 from PIL import Image
 from pynput.keyboard import Controller
 from pytesseract import pytesseract
 
+# from scipy import ndimage
+
+
 sct = mss.mss()
 
 # box that checks the content of the current prompt in the bottom left corner
-prompt_box = {"top": 830, "left": 40, "width": 170, "height": 30}
+prompt_box = {"top": 825, "left": 40, "width": 370, "height": 35}
 
 # box that checks respawn restricted
 restricted_box = {"top": 460, "left": 840, "width": 240, "height": 30}
@@ -27,30 +31,47 @@ keyboard = Controller()
 
 is_running = False
 next_split = False
+# this is set True if the next Split splits on the same input as the current one. in this case there will be a downtime
+# before it will check for the next screenshot to avoid double splitting on one pic
+dupe_split = False
+block_screenshots = False
+
+
+def start_auto_splitter_thread(splits):
+    split_thread = threading.Thread(target=start_auto_splitter, args=(splits,))
+    split_thread.start()
 
 
 def start_auto_splitter(splits):
-    global is_running, next_split
+    global is_running, next_split, dupe_split
     is_running = True
     current_split = ""
+    splits_copy = splits.copy()
     while is_running:
         if not next_split:
             next_split = True
             if len(splits) > 0:
                 current_split = splits.pop(0)
+                if len(splits) > 0:
+                    dupe_split = current_split[0] == splits[0][0]
+                else:
+                    dupe_split = False
             else:
                 break
+        if not block_screenshots:
+            if current_split[0] == "New Objective":
+                check_new_objective(current_split[1])
+            elif current_split[0] == "Respawning Restricted":
+                check_darkness_zone(current_split[1])
+            elif current_split[0] == "Access Granted":
+                check_access_granted(current_split[1])
+            elif current_split[0] == "Mission Completed":
+                check_mission_complete(current_split[1])
+            else:
+                check_custom_prompt(current_split[0])
 
-        if current_split[0] == "New Objective":
-            check_new_objective(current_split[1])
-        elif current_split[0] == "Respawning Restricted":
-            check_darkness_zone(current_split[1])
-        elif current_split[0] == "Access Granted":
-            check_access_granted(current_split[1])
-        elif current_split[0] == "Mission Completed":
-            check_mission_complete(current_split[1])
-        else:
-            check_custom_prompt(current_split[0])
+    if is_running:
+        start_auto_splitter_thread(splits_copy)
 
 
 def stop_auto_splitter():
@@ -67,16 +88,30 @@ def take_screenshot(area):
 
 
 def check_text(target_text, img, dummy):
-    global next_split
-    text = pytesseract.image_to_string(img, config=r"--psm 6 --oem 3")
+    global next_split, dupe_split, block_screenshots
+    text = pytesseract.image_to_string(img, config=r"--psm 13 --oem 3", lang='eng')
+    # for psm in range(6, 13 + 1):
+    #     config = '--oem 3 --psm %d' % psm
+    #     text = pytesseract.image_to_string(img, config=config, lang='eng')
+    #     print('psm ', psm, ':', text)
     print(text)
     if target_text in text:
         # keyboard.press(KeyCode.from_vk(0x61))
         if not dummy:
             pyautogui.press('num1')
-        time.sleep(6)
-        next_split = False
+        if dupe_split:
+            # time.sleep(6)
+            block_screenshots = True
+            th.Timer(6, set_next_split).start()
+        else:
+            next_split = False
         # break
+
+
+def set_next_split():
+    global next_split, block_screenshots
+    next_split = False
+    block_screenshots = False
 
 
 def check_new_objective(dummy):

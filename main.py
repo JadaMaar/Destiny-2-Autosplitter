@@ -1,6 +1,7 @@
 import customtkinter
 import autosplitter
 from tkinter import filedialog as fd
+import threading
 
 
 def add_split(name, is_dummy):
@@ -90,7 +91,7 @@ title = customtkinter.CTkLabel(app, text="Autosplitter :D")
 title.pack(padx=10, pady=10)
 
 start = customtkinter.CTkButton(app, text="Start Autosplitter",
-                                command=lambda: autosplitter.start_auto_splitter(run_splits))
+                                command=lambda: autosplitter.start_auto_splitter_thread(run_splits))
 start.pack(pady=10, side=customtkinter.TOP)
 
 stop = customtkinter.CTkButton(app, text="Stop Autosplitter", command=lambda: autosplitter.stop_auto_splitter())
