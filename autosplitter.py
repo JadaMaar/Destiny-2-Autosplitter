@@ -5,6 +5,10 @@ import pyautogui
 from PIL import Image
 from pynput.keyboard import Controller
 from pytesseract import pytesseract
+import time
+import multiprocessing as mp
+import tesserocr
+from tesserocr import get_languages
 
 # from scipy import ndimage
 
@@ -25,7 +29,7 @@ mission_complete_box = {"top": 70, "left": 190, "width": 660, "height": 70}
 
 # pytesseract installation path
 path_to_tesseract = r"G:\Program Files\Tesseract-OCR\tesseract.exe"
-pytesseract.tesseract_cmd = path_to_tesseract
+# pytesseract.tesseract_cmd = path_to_tesseract
 
 keyboard = Controller()
 
@@ -36,6 +40,8 @@ next_split = False
 dupe_split = False
 block_screenshots = False
 
+delta = 0.0
+
 
 def start_auto_splitter_thread(splits):
     split_thread = threading.Thread(target=start_auto_splitter, args=(splits,))
@@ -43,7 +49,7 @@ def start_auto_splitter_thread(splits):
 
 
 def start_auto_splitter(splits):
-    global is_running, next_split, dupe_split
+    global is_running, next_split, dupe_split, delta
     is_running = True
     current_split = ""
     splits_copy = splits.copy()
@@ -69,14 +75,14 @@ def start_auto_splitter(splits):
                 check_mission_complete(current_split[1])
             else:
                 check_custom_prompt(current_split[0])
-
     if is_running:
         start_auto_splitter_thread(splits_copy)
 
 
 def stop_auto_splitter():
-    global is_running
+    global is_running, next_split
     is_running = False
+    next_split = False
 
 
 def take_screenshot(area):
@@ -89,18 +95,19 @@ def take_screenshot(area):
 
 def check_text(target_text, img, dummy):
     global next_split, dupe_split, block_screenshots
-    text = pytesseract.image_to_string(img, config=r"--psm 13 --oem 3", lang='eng')
+    api = tesserocr.PyTessBaseAPI(path='./tessdata-main')
+    api.SetImage(img)
+    text = api.GetUTF8Text()
+    # text = pytesseract.image_to_string(img, config=r"--psm 6 --oem 3", lang='eng')
     # for psm in range(6, 13 + 1):
     #     config = '--oem 3 --psm %d' % psm
     #     text = pytesseract.image_to_string(img, config=config, lang='eng')
     #     print('psm ', psm, ':', text)
     print(text)
     if target_text in text:
-        # keyboard.press(KeyCode.from_vk(0x61))
         if not dummy:
             pyautogui.press('num1')
         if dupe_split:
-            # time.sleep(6)
             block_screenshots = True
             th.Timer(6, set_next_split).start()
         else:
