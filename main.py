@@ -22,8 +22,8 @@ def add_split(name, is_dummy):
 def remove_split():
     if len(split_text_boxes) > 0:
         split_text_boxes[-1].pack_forget()
-        del(split_text_boxes[-1])
-        del(run_splits[-1])
+        del (split_text_boxes[-1])
+        del (run_splits[-1])
 
 
 def clear_splits():
@@ -80,6 +80,8 @@ if __name__ == "__main__":
     run_splits = []
     split_text_boxes = []
 
+    autosplitter.monitor_setup()
+
     # setup UI
     customtkinter.set_appearance_mode("System")
     customtkinter.set_default_color_theme("blue")
@@ -89,7 +91,6 @@ if __name__ == "__main__":
     app.title("Destiny 2 Autosplitter")
     app.iconbitmap("WLZ.ico")
     app.resizable(False, False)
-
 
     title = customtkinter.CTkLabel(app, text="Autosplitter :D")
     title.grid(row=0, column=0, padx=10, pady=10, columnspan=2)
@@ -107,8 +108,9 @@ if __name__ == "__main__":
     load = customtkinter.CTkButton(app, text="Load Splits", command=lambda: load_splits())
     load.grid(row=2, column=1, pady=10)
 
-    split_option = customtkinter.CTkOptionMenu(app,  values=["New Objective", "Respawning Restricted", "Mission Completed",
-                                                             "Custom"], command=option_menu_callback)
+    split_option = customtkinter.CTkOptionMenu(app,
+                                               values=["New Objective", "Respawning Restricted", "Mission Completed",
+                                                       "Custom"], command=option_menu_callback)
     split_option.grid(row=3, column=0, columnspan=2)
 
     split_text = customtkinter.CTkTextbox(app, width=400, height=2, corner_radius=0)

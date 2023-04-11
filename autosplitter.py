@@ -8,7 +8,7 @@ from pytesseract import pytesseract
 import time
 import multiprocessing as mp
 import tesserocr
-from tesserocr import get_languages
+from screeninfo import get_monitors
 
 # from scipy import ndimage
 
@@ -26,6 +26,8 @@ new_objective_box = {"top": 265, "left": 190, "width": 200, "height": 30}
 
 # mission complete box
 mission_complete_box = {"top": 70, "left": 190, "width": 660, "height": 70}
+
+screenshot_boxes = [prompt_box, restricted_box, new_objective_box, mission_complete_box]
 
 # pytesseract installation path
 path_to_tesseract = r"G:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -49,7 +51,7 @@ def start_auto_splitter_thread(splits):
 
 
 def start_auto_splitter(splits):
-    global is_running, next_split, dupe_split, delta
+    global is_running, next_split, dupe_split, delta, process, total_no, total_rest, total_mc, total_custom, count_rest, count_no, count_mc, count_custom
     is_running = True
     current_split = ""
     splits_copy = splits.copy()
@@ -95,7 +97,7 @@ def take_screenshot(area):
 
 def check_text(target_text, img, dummy):
     global next_split, dupe_split, block_screenshots
-    api = tesserocr.PyTessBaseAPI(path='./tessdata-main')
+    api = tesserocr.PyTessBaseAPI(path='./tessdata_fast-main')
     api.SetImage(img)
     text = api.GetUTF8Text()
     # text = pytesseract.image_to_string(img, config=r"--psm 6 --oem 3", lang='eng')
@@ -144,6 +146,7 @@ def check_custom_prompt(prompt):
     img = take_screenshot(prompt_box)
     check_text(prompt, img, False)
 
+
 # run_splits = [
 #    # Darkness Zone
 #    ("Respawning Restricted", False),
@@ -169,3 +172,21 @@ def check_custom_prompt(prompt):
 #    ("MC", False)]
 
 # start_auto_splitter(run_splits)
+def get_main_monitor():
+    for m in get_monitors():
+        if m.is_primary:
+            return m
+
+
+def monitor_setup():
+    main_monitor = get_main_monitor()
+    width = main_monitor.width
+    height = main_monitor.height
+    x_modifier = width / 1920
+    y_modifier = height / 1080
+    for box in screenshot_boxes:
+        box["left"] = int(box["left"] * x_modifier)
+        box["top"] = int(box["top"] * y_modifier)
+        box["width"] = int(box["width"] * x_modifier)
+        box["height"] = int(box["height"] * y_modifier)
+    print(screenshot_boxes)
