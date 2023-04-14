@@ -1,13 +1,9 @@
-import threading
 import threading as th
 import mss
 import pyautogui
+import tesserocr
 from PIL import Image
 from pynput.keyboard import Controller
-from pytesseract import pytesseract
-import time
-import multiprocessing as mp
-import tesserocr
 from screeninfo import get_monitors
 
 # from scipy import ndimage
@@ -46,13 +42,14 @@ delta = 0.0
 
 
 def start_auto_splitter_thread(splits):
-    split_thread = threading.Thread(target=start_auto_splitter, args=(splits,))
+    split_thread = th.Thread(target=start_auto_splitter, args=(splits,))
     split_thread.start()
 
 
 def start_auto_splitter(splits):
     global is_running, next_split, dupe_split, delta, process, total_no, total_rest, total_mc, total_custom, count_rest, count_no, count_mc, count_custom
     is_running = True
+    next_split = False
     current_split = ""
     splits_copy = splits.copy()
     while is_running:
@@ -97,7 +94,7 @@ def take_screenshot(area):
 
 def check_text(target_text, img, dummy):
     global next_split, dupe_split, block_screenshots
-    api = tesserocr.PyTessBaseAPI(path='./tessdata_fast-main')
+    api = tesserocr.PyTessBaseAPI()
     api.SetImage(img)
     text = api.GetUTF8Text()
     # text = pytesseract.image_to_string(img, config=r"--psm 6 --oem 3", lang='eng')

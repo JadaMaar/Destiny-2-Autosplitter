@@ -1,8 +1,12 @@
+from tkinter import filedialog as fd
 import customtkinter
 import autosplitter
-from tkinter import filedialog as fd
-import threading
-import multiprocessing as mp
+
+
+def close():
+    autosplitter.stop_auto_splitter()
+    app.quit()
+    app.destroy()
 
 
 def add_split(name, is_dummy):
@@ -76,6 +80,17 @@ def option_menu_callback(choice):
     # print("optionmenu dropdown clicked:", choice)
 
 
+def start_auto_splitter(splits):
+    print(start.cget("fg_color"))
+    autosplitter.start_auto_splitter_thread(splits)
+    start.configure(fg_color="green")
+
+
+def stop_auto_splitter():
+    autosplitter.stop_auto_splitter()
+    start.configure(fg_color="#1F6AA5")
+
+
 if __name__ == "__main__":
     run_splits = []
     split_text_boxes = []
@@ -83,23 +98,23 @@ if __name__ == "__main__":
     autosplitter.monitor_setup()
 
     # setup UI
-    customtkinter.set_appearance_mode("System")
+    customtkinter.set_appearance_mode("Dark")
     customtkinter.set_default_color_theme("blue")
 
     app = customtkinter.CTk()
     app.geometry("400x550")
     app.title("Destiny 2 Autosplitter")
-    app.iconbitmap("WLZ.ico")
+    # app.iconbitmap("WLZ.ico")
     app.resizable(False, False)
 
     title = customtkinter.CTkLabel(app, text="Autosplitter :D")
     title.grid(row=0, column=0, padx=10, pady=10, columnspan=2)
 
     start = customtkinter.CTkButton(app, text="Start Autosplitter",
-                                    command=lambda: autosplitter.start_auto_splitter_thread(run_splits.copy()))
+                                    command=lambda: start_auto_splitter(run_splits.copy()))
     start.grid(row=1, column=0, pady=10)
 
-    stop = customtkinter.CTkButton(app, text="Stop Autosplitter", command=lambda: autosplitter.stop_auto_splitter())
+    stop = customtkinter.CTkButton(app, text="Stop Autosplitter", command=lambda: stop_auto_splitter())
     stop.grid(row=1, column=1, pady=10)
 
     save = customtkinter.CTkButton(app, text="Save Splits", command=lambda: save_splits())
@@ -130,4 +145,5 @@ if __name__ == "__main__":
     split_container = customtkinter.CTkScrollableFrame(app, width=200, height=200)
     split_container.grid(row=7, column=0, pady=10, columnspan=2)
 
+    app.protocol("WM_DELETE_WINDOW", lambda: close())
     app.mainloop()

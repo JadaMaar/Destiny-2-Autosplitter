@@ -1,0 +1,11 @@
+Respawning Restricted,False
+Access Granted,False
+Access Granted,False
+New Objective,True
+New Objective,False
+New Objective,False
+New Objective,False
+New Objective,False
+Brakion,False
+Brakion,False
+Mission Completed,False
