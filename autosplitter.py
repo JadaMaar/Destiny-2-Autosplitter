@@ -2,12 +2,9 @@ import threading
 import threading as th
 import mss
 import pyautogui
+import tesserocr
 from PIL import Image
 from pynput.keyboard import Controller
-from pytesseract import pytesseract
-import time
-import multiprocessing as mp
-import tesserocr
 from screeninfo import get_monitors
 
 # from scipy import ndimage
@@ -15,19 +12,10 @@ from screeninfo import get_monitors
 
 sct = mss.mss()
 
-# box that checks the content of the current prompt in the bottom left corner
-prompt_box = {"top": 825, "left": 40, "width": 370, "height": 35}
+# box checks for the finish label in the center of the screen
+finish_box = {"top": 460, "left": 540, "width": 820, "height": 200}
 
-# box that checks respawn restricted
-restricted_box = {"top": 460, "left": 840, "width": 240, "height": 30}
-
-# new objective box
-new_objective_box = {"top": 265, "left": 190, "width": 200, "height": 30}
-
-# mission complete box
-mission_complete_box = {"top": 70, "left": 190, "width": 660, "height": 70}
-
-screenshot_boxes = [prompt_box, restricted_box, new_objective_box, mission_complete_box]
+screenshot_boxes = [finish_box]
 
 # pytesseract installation path
 path_to_tesseract = r"G:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -45,13 +33,27 @@ block_screenshots = False
 delta = 0.0
 
 
+def orange_to_black(image):
+    image = image.convert('RGBA')
+    pixdata = image.load()
+    for y in range(image.size[1]):
+        for x in range(image.size[0]):
+            color = pixdata[x, y]
+            # print(color)
+            # if color[0] in range(200, 245) and color[1] in range(126, 140) and color[2] in range(23):
+            if color[0] in range(180, 255) and color[1] in range(110, 210) and color[2] in range(50):
+                pixdata[x, y] = (0, 0, 0, 255)
+
+    return image
+
+
 def start_auto_splitter_thread(splits):
     split_thread = threading.Thread(target=start_auto_splitter, args=(splits,))
     split_thread.start()
 
 
 def start_auto_splitter(splits):
-    global is_running, next_split, dupe_split, delta, process, total_no, total_rest, total_mc, total_custom, count_rest, count_no, count_mc, count_custom
+    global is_running, next_split, dupe_split, delta
     is_running = True
     current_split = ""
     splits_copy = splits.copy()
@@ -67,16 +69,8 @@ def start_auto_splitter(splits):
             else:
                 break
         if not block_screenshots:
-            if current_split[0] == "New Objective":
-                check_new_objective(current_split[1])
-            elif current_split[0] == "Respawning Restricted":
-                check_darkness_zone(current_split[1])
-            elif current_split[0] == "Access Granted":
-                check_access_granted(current_split[1])
-            elif current_split[0] == "Mission Completed":
-                check_mission_complete(current_split[1])
-            else:
-                check_custom_prompt(current_split[0])
+            if current_split[0] == "round":
+                check_round()
     if is_running:
         start_auto_splitter_thread(splits_copy)
 
@@ -92,20 +86,21 @@ def take_screenshot(area):
     img = Image.new("RGB", sct_img.size)
     pixels = zip(sct_img.raw[2::4], sct_img.raw[1::4], sct_img.raw[::4])
     img.putdata(list(pixels))
+    img = orange_to_black(img)
     return img
 
 
 def check_text(target_text, img, dummy):
     global next_split, dupe_split, block_screenshots
-    api = tesserocr.PyTessBaseAPI(path='./tessdata_fast-main')
+    api = tesserocr.PyTessBaseAPI(path='./tessdata_fast-main', psm=tesserocr.PSM.SINGLE_WORD)
     api.SetImage(img)
     text = api.GetUTF8Text()
-    # text = pytesseract.image_to_string(img, config=r"--psm 6 --oem 3", lang='eng')
+    # text = pytesseract.image_to_string(img, config=r"--psm 12 --oem 3", lang='eng')
     # for psm in range(6, 13 + 1):
     #     config = '--oem 3 --psm %d' % psm
     #     text = pytesseract.image_to_string(img, config=config, lang='eng')
     #     print('psm ', psm, ':', text)
-    print(text)
+    print("TEXT: " + text + ";")
     if target_text in text:
         if not dummy:
             pyautogui.press('num1')
@@ -123,28 +118,9 @@ def set_next_split():
     block_screenshots = False
 
 
-def check_new_objective(dummy):
-    img = take_screenshot(new_objective_box)
-    check_text("NEW OBJECTIVE", img, dummy)
-
-
-def check_darkness_zone(dummy):
-    img = take_screenshot(restricted_box)
-    check_text("Respawning Restricted", img, dummy)
-
-
-def check_mission_complete(dummy):
-    img = take_screenshot(mission_complete_box)
-    check_text("MISSION COMPLETE", img, dummy)
-
-
-def check_access_granted(dummy):
-    check_custom_prompt("Access Granted")
-
-
-def check_custom_prompt(prompt):
-    img = take_screenshot(prompt_box)
-    check_text(prompt, img, False)
+def check_round():
+    im = take_screenshot(finish_box)
+    check_text("FINISH", im, False)
 
 
 # run_splits = [

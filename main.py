@@ -1,8 +1,12 @@
+from tkinter import filedialog as fd
 import customtkinter
 import autosplitter
-from tkinter import filedialog as fd
-import threading
-import multiprocessing as mp
+
+
+def close():
+    autosplitter.stop_auto_splitter()
+    app.quit()
+    app.destroy()
 
 
 def add_split(name, is_dummy):
@@ -32,12 +36,24 @@ def clear_splits():
         remove_split()
 
 
+def start_auto_splitter(splits):
+    print(start.cget("fg_color"))
+    autosplitter.start_auto_splitter_thread(splits)
+    start.configure(fg_color="green")
+
+
+def stop_auto_splitter():
+    autosplitter.stop_auto_splitter()
+    start.configure(fg_color="#1F6AA5")
+
+
 def manual_add_split():
     command = split_option.get()
     is_dummy = dummy.get() == 1
     print(is_dummy)
     if command != "Custom":
-        add_split(command, is_dummy)
+        for i in range(int(command)):
+            add_split("round", is_dummy)
     else:
         add_split(split_text.get("0.0", 'end-1c'), is_dummy)
 
@@ -96,10 +112,10 @@ if __name__ == "__main__":
     title.grid(row=0, column=0, padx=10, pady=10, columnspan=2)
 
     start = customtkinter.CTkButton(app, text="Start Autosplitter",
-                                    command=lambda: autosplitter.start_auto_splitter_thread(run_splits.copy()))
+                                    command=lambda: start_auto_splitter(run_splits.copy()))
     start.grid(row=1, column=0, pady=10)
 
-    stop = customtkinter.CTkButton(app, text="Stop Autosplitter", command=lambda: autosplitter.stop_auto_splitter())
+    stop = customtkinter.CTkButton(app, text="Stop Autosplitter", command=lambda: stop_auto_splitter())
     stop.grid(row=1, column=1, pady=10)
 
     save = customtkinter.CTkButton(app, text="Save Splits", command=lambda: save_splits())
@@ -109,8 +125,7 @@ if __name__ == "__main__":
     load.grid(row=2, column=1, pady=10)
 
     split_option = customtkinter.CTkOptionMenu(app,
-                                               values=["New Objective", "Respawning Restricted", "Mission Completed",
-                                                       "Custom"], command=option_menu_callback)
+                                               values=["1", "2", "3", "4", "5", "32"], command=option_menu_callback)
     split_option.grid(row=3, column=0, columnspan=2)
 
     split_text = customtkinter.CTkTextbox(app, width=400, height=2, corner_radius=0)
@@ -130,4 +145,5 @@ if __name__ == "__main__":
     split_container = customtkinter.CTkScrollableFrame(app, width=200, height=200)
     split_container.grid(row=7, column=0, pady=10, columnspan=2)
 
+    app.protocol("WM_DELETE_WINDOW", lambda: close())
     app.mainloop()
