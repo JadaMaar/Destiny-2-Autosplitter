@@ -1,6 +1,8 @@
 from tkinter import filedialog as fd
 import customtkinter
 import autosplitter
+import os
+import threading
 
 
 def close():
@@ -10,6 +12,7 @@ def close():
 
 
 def add_split(name, is_dummy):
+    stop_auto_splitter()
     new_split = customtkinter.CTkTextbox(split_container, width=400, height=2, corner_radius=0)
     new_split.configure(state='normal')
     new_split.insert("0.0", name)
@@ -24,6 +27,7 @@ def add_split(name, is_dummy):
 
 
 def remove_split():
+    stop_auto_splitter()
     if len(split_text_boxes) > 0:
         split_text_boxes[-1].pack_forget()
         del (split_text_boxes[-1])
@@ -92,6 +96,8 @@ def stop_auto_splitter():
 
 
 if __name__ == "__main__":
+    os.environ['OMP_THREAD_LIMIT'] = '1'
+
     run_splits = []
     split_text_boxes = []
 
@@ -107,8 +113,8 @@ if __name__ == "__main__":
     # app.iconbitmap("WLZ.ico")
     app.resizable(False, False)
 
-    title = customtkinter.CTkLabel(app, text="Autosplitter :D")
-    title.grid(row=0, column=0, padx=10, pady=10, columnspan=2)
+    title_label = customtkinter.CTkLabel(app, text="Autosplitter :D")
+    title_label.grid(row=0, column=0, padx=10, pady=10, columnspan=2)
 
     start = customtkinter.CTkButton(app, text="Start Autosplitter",
                                     command=lambda: start_auto_splitter(run_splits.copy()))

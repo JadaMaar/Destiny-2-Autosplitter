@@ -1,4 +1,7 @@
+import os
 import threading as th
+import time
+
 import mss
 import pyautogui
 import tesserocr
@@ -6,8 +9,7 @@ from PIL import Image
 from pynput.keyboard import Controller
 from screeninfo import get_monitors
 
-# from scipy import ndimage
-
+import main
 
 sct = mss.mss()
 
@@ -28,6 +30,7 @@ screenshot_boxes = [prompt_box, restricted_box, new_objective_box, mission_compl
 # pytesseract installation path
 path_to_tesseract = r"G:\Program Files\Tesseract-OCR\tesseract.exe"
 # pytesseract.tesseract_cmd = path_to_tesseract
+api = tesserocr.PyTessBaseAPI(psm=tesserocr.PSM.SINGLE_COLUMN, lang="des")
 
 keyboard = Controller()
 
@@ -39,6 +42,7 @@ dupe_split = False
 block_screenshots = False
 
 delta = 0.0
+avg_fps = 0
 
 
 def start_auto_splitter_thread(splits):
@@ -47,12 +51,18 @@ def start_auto_splitter_thread(splits):
 
 
 def start_auto_splitter(splits):
-    global is_running, next_split, dupe_split, delta, process, total_no, total_rest, total_mc, total_custom, count_rest, count_no, count_mc, count_custom
+    global is_running, next_split, dupe_split, delta, avg_fps
     is_running = True
+    os.environ['OMP_THREAD_LIMIT'] = '1'
+    count = 0
+    total = 0
     next_split = False
     current_split = ""
     splits_copy = splits.copy()
     while is_running:
+        #####
+        current_time = time.time()
+        #####
         if not next_split:
             next_split = True
             if len(splits) > 0:
@@ -74,6 +84,18 @@ def start_auto_splitter(splits):
                 check_mission_complete(current_split[1])
             else:
                 check_custom_prompt(current_split[0])
+        next_time = time.time()
+        delta = (next_time - current_time)
+        if delta < (1 / 100):
+            time.sleep((1 / 100) - delta)
+        next_time = time.time()
+        delta = (next_time - current_time)
+        if delta != 0:
+            fps = 1 / delta
+            count += 1
+            total += fps
+        avg_fps = (total / count)
+        print(avg_fps)
     if is_running:
         start_auto_splitter_thread(splits_copy)
 
@@ -89,12 +111,13 @@ def take_screenshot(area):
     img = Image.new("RGB", sct_img.size)
     pixels = zip(sct_img.raw[2::4], sct_img.raw[1::4], sct_img.raw[::4])
     img.putdata(list(pixels))
+    img = img.convert("L")
     return img
 
 
 def check_text(target_text, img, dummy):
     global next_split, dupe_split, block_screenshots
-    api = tesserocr.PyTessBaseAPI()
+    target_text = target_text.lower()
     api.SetImage(img)
     text = api.GetUTF8Text()
     # text = pytesseract.image_to_string(img, config=r"--psm 6 --oem 3", lang='eng')
@@ -102,8 +125,10 @@ def check_text(target_text, img, dummy):
     #     config = '--oem 3 --psm %d' % psm
     #     text = pytesseract.image_to_string(img, config=config, lang='eng')
     #     print('psm ', psm, ':', text)
-    print(text)
+    text = text.lower()
+    print("TEXT: " + str(text))
     if target_text in text:
+        # print("TRIGGER")
         if not dummy:
             pyautogui.press('num1')
         if dupe_split:
@@ -111,7 +136,7 @@ def check_text(target_text, img, dummy):
             th.Timer(6, set_next_split).start()
         else:
             next_split = False
-        # break
+    # break
 
 
 def set_next_split():
@@ -122,7 +147,7 @@ def set_next_split():
 
 def check_new_objective(dummy):
     img = take_screenshot(new_objective_box)
-    check_text("NEW OBJECTIVE", img, dummy)
+    check_text("NEW", img, dummy)
 
 
 def check_darkness_zone(dummy):
@@ -132,7 +157,7 @@ def check_darkness_zone(dummy):
 
 def check_mission_complete(dummy):
     img = take_screenshot(mission_complete_box)
-    check_text("MISSION COMPLETE", img, dummy)
+    check_text("MISSION", img, dummy)
 
 
 def check_access_granted(dummy):
