@@ -1,8 +1,9 @@
+import time
 from tkinter import filedialog as fd
 import customtkinter
 import autosplitter
-import os
 import threading
+import psutil
 
 
 def close():
@@ -95,13 +96,20 @@ def stop_auto_splitter():
     start.configure(fg_color="#1F6AA5")
 
 
+def cap_fps():
+    autosplitter.fps_cap = int(fps_cap.get("0.0", 'end-1c'))
+    time.sleep(1)
+    fps_cap_btn.configure(text=f"CAP FPS\nAVG {round(autosplitter.avg_fps, 2)} FPS")
+
+
 if __name__ == "__main__":
-    os.environ['OMP_THREAD_LIMIT'] = '1'
+    # os.environ['OMP_THREAD_LIMIT'] = '1'
 
     run_splits = []
     split_text_boxes = []
 
     autosplitter.monitor_setup()
+    # autosplitter.get_hotkeys()
 
     # setup UI
     customtkinter.set_appearance_mode("Dark")
@@ -113,8 +121,13 @@ if __name__ == "__main__":
     # app.iconbitmap("WLZ.ico")
     app.resizable(False, False)
 
-    title_label = customtkinter.CTkLabel(app, text="Autosplitter :D")
-    title_label.grid(row=0, column=0, padx=10, pady=10, columnspan=2)
+    # title_label = customtkinter.CTkLabel(app, text="Autosplitter :D")
+    # title_label.grid(row=0, column=0, padx=10, pady=10, columnspan=2)
+    fps_cap = customtkinter.CTkTextbox(app, width=150, height=2, corner_radius=0)
+    fps_cap.grid(row=0, column=0, pady=10)
+
+    fps_cap_btn = customtkinter.CTkButton(app, text="CAP FPS", command=lambda: cap_fps())
+    fps_cap_btn.grid(row=0, column=1, pady=10)
 
     start = customtkinter.CTkButton(app, text="Start Autosplitter",
                                     command=lambda: start_auto_splitter(run_splits.copy()))
@@ -130,8 +143,8 @@ if __name__ == "__main__":
     load.grid(row=2, column=1, pady=10)
 
     split_option = customtkinter.CTkOptionMenu(app,
-                                               values=["New Objective", "Respawning Restricted", "Mission Completed",
-                                                       "Custom"], command=option_menu_callback)
+                                               values=["New Objective", "Objective Complete", "Respawning Restricted",
+                                                       "Mission Completed", "Custom"], command=option_menu_callback)
     split_option.grid(row=3, column=0, columnspan=2)
 
     split_text = customtkinter.CTkTextbox(app, width=400, height=2, corner_radius=0)
