@@ -109,7 +109,7 @@ if __name__ == "__main__":
     split_text_boxes = []
 
     autosplitter.monitor_setup()
-    # autosplitter.get_hotkeys()
+    # autosplitter.test()
 
     # setup UI
     customtkinter.set_appearance_mode("Dark")
@@ -144,7 +144,9 @@ if __name__ == "__main__":
 
     split_option = customtkinter.CTkOptionMenu(app,
                                                values=["New Objective", "Objective Complete", "Respawning Restricted",
-                                                       "Mission Completed", "Custom"], command=option_menu_callback)
+                                                       "Wipe Screen", "Joining Allies",
+                                                       "Boss Spawn", "Boss Dead", "Mission Completed", "Custom"],
+                                               command=option_menu_callback)
     split_option.grid(row=3, column=0, columnspan=2)
 
     split_text = customtkinter.CTkTextbox(app, width=400, height=2, corner_radius=0)

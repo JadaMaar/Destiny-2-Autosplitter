@@ -5,6 +5,7 @@ from datetime import datetime
 from socket import socket
 
 import mss
+import numpy as np
 import psutil
 import pyautogui
 import tesserocr
@@ -19,6 +20,7 @@ import requests
 import keyboard
 import os
 import ctypes
+import cv2
 
 print("CUDA AVAILABLE: " + str(torch.version.cuda))
 print(tesserocr.tesseract_version())
@@ -41,6 +43,15 @@ objective_complete_box = {"top": 265, "left": 155, "width": 260, "height": 30}
 # mission complete box
 mission_complete_box = {"top": 70, "left": 190, "width": 660, "height": 70}
 
+# boss hp bar
+boss_hp_box = {"top": 978, "left": 645, "width": 10, "height": 5}
+
+# wipe screen
+light_fading_box = {"top": 100, "left": 400, "width": 200, "height": 70}
+
+# joining allies
+joining_allies_box = {"top": 815, "left": 805, "width": 140, "height": 28}
+
 screenshot_boxes = [prompt_box, restricted_box, new_objective_box, mission_complete_box, objective_complete_box]
 
 # pytesseract installation path
@@ -48,7 +59,7 @@ path_to_tesseract = r"G:\Program Files\Tesseract-OCR\tesseract.exe"
 # pytesseract.tesseract_cmd = path_to_tesseract
 api = tesserocr.PyTessBaseAPI(lang="eng")
 # reader = easyocr.Reader(['en'], gpu=True)
-api.SetPageSegMode(tesserocr.PSM.SINGLE_LINE)
+# api.SetPageSegMode(tesserocr.PSM.SINGLE_LINE)
 
 is_running = False
 next_split = False
@@ -56,6 +67,10 @@ next_split = False
 # before it will check for the next screenshot to avoid double splitting on one pic
 dupe_split = False
 block_screenshots = False
+# activates ocr for objective splits while true
+objective_flash = False
+# min ratio to check for text
+ratio_threshold = 0.3
 
 delta = 0.0
 avg_fps = 0
@@ -65,6 +80,7 @@ threads_list = []
 # split variables
 split_index = 0
 reset = False
+autosplit = False
 
 
 def start_auto_splitter_thread(splits):
@@ -120,12 +136,20 @@ def start_auto_splitter(splits):
                 check_access_granted(current_split[1])
             elif current_split[0] == "Mission Completed":
                 check_mission_complete(current_split[1])
+            elif current_split[0] == "Boss Spawn":
+                check_boss(current_split[1], True)
+            elif current_split[0] == "Boss Dead":
+                check_boss(current_split[1], False)
+            elif current_split[0] == "Wipe Screen":
+                check_wipe_screen()
+            elif current_split[0] == "Joining Allies":
+                check_joining()
             else:
                 check_custom_prompt(current_split[0])
-            # next_time = datetime.now().timestamp()
-            # delta = (next_time - current_time)
-            # if delta < (1 / fps_cap):
-            #     time.sleep((1 / fps_cap) - delta)
+            next_time = datetime.now().timestamp()
+            delta = (next_time - current_time)
+            if delta < (1 / fps_cap):
+                time.sleep((1 / fps_cap) - delta)
             next_time = datetime.now().timestamp()
             delta = (next_time - current_time)
             current_time = datetime.now().timestamp()
@@ -137,8 +161,8 @@ def start_auto_splitter(splits):
                 avg_fps = (total / count)
             # print(avg_fps)
             # print(f"CPU usage: {psutil.cpu_percent()}")
-    if is_running:
-        start_auto_splitter_thread(splits_copy)
+    # if is_running:
+    #     start_auto_splitter_thread(splits_copy)
 
 
 def stop_auto_splitter():
@@ -152,37 +176,26 @@ def take_screenshot(area):
     img = Image.new("RGB", sct_img.size)
     pixels = zip(sct_img.raw[2::4], sct_img.raw[1::4], sct_img.raw[::4])
     img.putdata(list(pixels))
-    # img = img.resize((img.width * 2, img.height * 2))
-    # img = img.rotate(-3, resample=Image.BICUBIC, expand=True)
-    # img = img.convert("L")
-    # img.save("test.png")
-    # img.show()
 
-    # convert image to greyscale
-    img = img.convert('L')
-    # width, height = img.size
-    # binary_image(img, 0, width, 0, height)
-    # img.save("test.png")
+    # turn and crop image for better screenshot
+    # if area == prompt_box:
+    #     img = img.rotate(-3, resample=Image.BICUBIC, expand=True)
+    #     img = img.crop((7, 16, 370, 35))
+
+    # convert image to greyscale and apply threshold
+
+    # if area in [new_objective_box, objective_complete_box]:
+    #     img = img.convert('L')
+    #     img = np.array(img)
+    #     # TODO: test other thresh modes
+    #     im_bw = cv2.threshold(img, 230, 255, cv2.THRESH_TOZERO)[1]
+    #     img = Image.fromarray(im_bw)
+
     return img
 
 
-def binary_image(img, x_start, x_end, y_start, y_end):
-    thresh = 200
-    # traverse through pixels
-    for x in range(x_start, x_end):
-        for y in range(y_start, y_end):
-
-            # if intensity less than threshold, assign white
-            if img.getpixel((x, y)) < thresh:
-                img.putpixel((x, y), 0)
-
-            # if intensity greater than threshold, assign black
-            else:
-                img.putpixel((x, y), 255)
-
-
 def check_text(target_text, img, dummy):
-    global next_split, dupe_split, block_screenshots
+    global next_split, dupe_split, block_screenshots, autosplit
     target_text = target_text.lower()
 
     # tesserocr implementation
@@ -215,6 +228,7 @@ def check_text(target_text, img, dummy):
         if not dummy:
             # pyautogui.press('num1')
             l.startOrSplit()
+            autosplit = True
         if dupe_split:
             block_screenshots = True
             th.Timer(6, set_next_split).start()
@@ -230,22 +244,29 @@ def set_next_split():
 
 
 def check_new_objective(dummy):
+    global objective_flash
     img = take_screenshot(new_objective_box)
-    """"
-    w, h = img.size
-    # split image in 3 parts
-    im1 = img.crop((0, 0, w//3, h))
-    im2 = img.crop((w//3, 0, 2 * w//3, h))
-    im3 = img.crop((2 * w//3, 0, w, h))
-    im1.show()
-    im2.show()
-    im3.show()
-    splits = [im1, im2, im3]
-    pool = mp.Pool(processes=1)
-    pool.map(get_text, splits)
-    pool.close()
-    """
-    check_text("NEW", img, dummy)
+    ratio = get_bw_ratio(img)
+    # if not objective_flash and ratio > ratio_threshold:
+    #     objective_flash = True
+    #     th.Timer(1, set_objective_flash).start()
+    # if objective_flash:
+    check_text("NEW OBJECTIVE", img, dummy)
+
+
+def get_bw_ratio(img):
+    img1 = np.array(img)
+    number_of_white_pix = np.sum(img1 > 0)  # extracting only white pixels
+    number_of_black_pix = np.sum(img1 == 0)  # extracting only black pixels
+    if number_of_black_pix == 0:
+        number_of_black_pix = 1
+    ratio = number_of_white_pix / number_of_black_pix
+    return ratio
+
+
+def set_objective_flash():
+    global objective_flash
+    objective_flash = False
 
 
 def check_objective_complete(dummy):
@@ -277,7 +298,88 @@ def check_access_granted(dummy):
 
 def check_custom_prompt(prompt):
     img = take_screenshot(prompt_box)
+    # if not is_player_prompt(img):
+    #     print("CHECK")
     check_text(prompt, img, False)
+
+
+def check_boss(dummy, spawn):
+    global autosplit, block_screenshots, next_split
+
+    img = take_screenshot(boss_hp_box)
+    # img.show()
+    light_orange = (1, 155, 155)
+    dark_orange = (25, 255, 255)
+    img1 = np.array(img)
+    hsv_img = cv2.cvtColor(img1, cv2.COLOR_RGB2HSV)
+    mask = cv2.inRange(hsv_img, light_orange, dark_orange)
+    result = cv2.bitwise_and(img1, img1, mask=mask)
+    # img = Image.fromarray(result)
+    # img.show()
+
+    number_of_black_pix = np.sum(result == 0)
+    other_pixel = np.sum(result != 0)
+    ratio = number_of_black_pix / (number_of_black_pix + other_pixel)
+
+    # if less than 10% of the pixel are black the boss is spawned and more than 80% he's basically dead TODO: adjust value
+    if spawn:
+        check = ratio < 0.1
+    else:
+        check = ratio > 0.8
+
+    if check:
+        if not dummy:
+            # pyautogui.press('num1')
+            l.startOrSplit()
+            autosplit = True
+        if dupe_split:
+            block_screenshots = True
+            th.Timer(6, set_next_split).start()
+        else:
+            next_split = False
+
+
+def check_wipe_screen():
+    # TODO: back2back wipescreen arent properly handled duration is variable and server dependend
+    img = take_screenshot(light_fading_box)
+    check_text("your", img, False)
+
+
+def check_joining():
+    img = take_screenshot(joining_allies_box)
+    check_text("joining", img, False)
+
+
+# returns whether the message in the prompt box was made by the player e.g. created orbs
+def is_player_prompt(img: Image):
+    # TODO: change the 7 to work for non 1080p monitors
+    triangle = img.crop((7, 12, prompt_box["width"] / 20, prompt_box["height"])).convert('L')
+    # triangle.show()
+    # img = img.convert('L')
+    img = np.array(triangle)
+    # TODO: test other thresh modes
+    im_bw = cv2.threshold(img, 100, 255, cv2.THRESH_OTSU)[1]
+    # img = Image.fromarray(im_bw)
+    # img.show()
+    # ratio = get_bw_ratio(img)
+    # print(f"bw ratio: {ratio}")
+    # return ratio > 0.2
+    canny = cv2.Canny(im_bw, 240, 255)
+    contours, hier = cv2.findContours(canny, 1, 2)
+    for cnt in contours:
+        approx = cv2.approxPolyDP(cnt, 0.02 * cv2.arcLength(cnt, True), True)
+        print(f"approx: {len(approx)}")
+        if len(approx) == 3:
+            cv2.drawContours(im_bw, [cnt], 0, (0, 255, 0), 2)
+            tri = approx
+    img = Image.fromarray(im_bw)
+    img.show()
+    # using a findContours() function
+    # _, thrash = cv2.threshold(img, 240, 255, cv2.CHAIN_APPROX_NONE)
+    # contours, _ = cv2.findContours(thrash, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    # for contour in contours:
+    #     approx = cv2.approxPolyDP(contour, .03 * cv2.arcLength(contour, True), True)
+    #     print(f"approx: {len(approx)}")
 
 
 # start_auto_splitter(run_splits)
@@ -287,10 +389,10 @@ def get_main_monitor():
             return m
 
 
-""""
 def get_hotkeys():
-    livesplit = socket()
-    livesplit.connect(("localhost", 16834))
+    global autosplit, split_index
+    livesplit = l.getSocket()# socket()
+    # livesplit.connect(("localhost", 16834))
     # livesplit.send("initgametime\r\n".encode())
     # livesplit.send("setcomparison gametime\r\n".encode())
     # livesplit.send("starttimer\r\n".encode())
@@ -301,18 +403,31 @@ def get_hotkeys():
     # print("reply: " + ls_time)
     # Listen for events
     # livesplit.settimeout(1)
+    prev_index = -1
     while True:
         try:
-            data = livesplit.recv(1024).decode()[:-2]
-            print("STUFF HAPPENS")
-            if data:
-                event = data
-                if "split" in event:
-                    print("Split triggered!")
+            livesplit.send("getsplitindex\r\n".encode())
+            current_index = livesplit.recv(1024).decode()[:-2]
+            if not autosplit:
+                if current_index == -1:
+                    split_index = 0
+                if current_index != prev_index:
+                    print(current_index)
+                    prev_index = current_index
+                    split_index += 1
+            # print("STUFF HAPPENS")
+            # if data:
+            #     event = data
+            #     if "split" in event:
+            #         print("Split triggered!")
         except:
             print("timeout")
             pass
-"""
+
+
+def test():
+    thread = th.Thread(target=get_hotkeys)
+    thread.start()
 
 
 def monitor_setup():
