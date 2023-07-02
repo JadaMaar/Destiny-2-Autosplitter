@@ -1,4 +1,3 @@
-import json
 import threading as th
 import time
 from datetime import datetime
@@ -6,26 +5,21 @@ from socket import socket
 
 import mss
 import numpy as np
-import psutil
 import pyautogui
 import tesserocr
-import torch
+# import torch
 from PIL import Image
 from screeninfo import get_monitors
-import subprocess
 import multiprocessing as mp
-from autocorrect import Speller
+# from autocorrect import Speller
 import livesplit
-import requests
 import keyboard
-import os
-import ctypes
 import cv2
 
-print("CUDA AVAILABLE: " + str(torch.version.cuda))
+# print("CUDA AVAILABLE: " + str(torch.version.cuda))
 print(tesserocr.tesseract_version())
 sct = mss.mss()
-spell = Speller()
+# spell = Speller()
 l = livesplit.Livesplit()
 
 # box that checks the content of the current prompt in the bottom left corner
@@ -44,7 +38,10 @@ objective_complete_box = {"top": 265, "left": 155, "width": 260, "height": 30}
 mission_complete_box = {"top": 70, "left": 190, "width": 660, "height": 70}
 
 # boss hp bar
-boss_hp_box = {"top": 978, "left": 645, "width": 10, "height": 5}
+# boss_hp_box = {"top": 978, "left": 645, "width": 10, "height": 5}
+# test
+boss_hp_box = {"top": 977, "left": 645, "width": 620, "height": 2}
+boss_name_box = {"top": 987, "left": 645, "width": 620, "height": 25}
 
 # wipe screen
 light_fading_box = {"top": 100, "left": 400, "width": 200, "height": 70}
@@ -52,7 +49,7 @@ light_fading_box = {"top": 100, "left": 400, "width": 200, "height": 70}
 # joining allies
 joining_allies_box = {"top": 815, "left": 805, "width": 140, "height": 28}
 
-screenshot_boxes = [prompt_box, restricted_box, new_objective_box, mission_complete_box, objective_complete_box]
+screenshot_boxes = [prompt_box, restricted_box, new_objective_box, mission_complete_box, objective_complete_box, boss_hp_box, light_fading_box, joining_allies_box]
 
 # pytesseract installation path
 path_to_tesseract = r"G:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -82,6 +79,8 @@ split_index = 0
 reset = False
 autosplit = False
 
+boss_dead_buffer = 3
+
 
 def start_auto_splitter_thread(splits):
     split_thread = th.Thread(target=start_auto_splitter, args=(splits,))
@@ -97,7 +96,7 @@ def read_image(q: mp.Queue):
 
 
 def start_auto_splitter(splits):
-    global is_running, next_split, dupe_split, delta, avg_fps, split_index, reset
+    global is_running, next_split, dupe_split, delta, avg_fps, split_index, reset, boss_dead_buffer
     is_running = True
     count = 0
     total = 0
@@ -110,11 +109,13 @@ def start_auto_splitter(splits):
         #####
         if reset:
             reset = False
+            print("reset")
             break
         #####
         if not next_split:
             next_split = True
             if len(splits) > split_index:
+                boss_dead_buffer = 3
                 current_split = splits[split_index]
                 print("CURRENT SPLIT: " + str(current_split))
                 split_index += 1
@@ -196,7 +197,17 @@ def take_screenshot(area):
 
 def check_text(target_text, img, dummy):
     global next_split, dupe_split, block_screenshots, autosplit
-    target_text = target_text.lower()
+    if not isinstance(target_text, list):
+        target_text = [target_text]
+    else:
+        img = img.convert('L')
+        # img.show()
+        img = np.array(img)
+        # TODO: test other thresh modes
+        im_bw = cv2.threshold(img, 180, 255, cv2.THRESH_BINARY)[1]
+        img = Image.fromarray(im_bw)
+        img.show()
+
 
     # tesserocr implementation
     api.SetImage(img)
@@ -221,19 +232,22 @@ def check_text(target_text, img, dummy):
     # text = tesserocr.image_to_text(img, oem=3)
     text = str(text).lower()
     # text = spell(text)
-    # print("TEXT: " + str(text))
+    print("TEXT: " + str(text))
     # text = "njogrsnognoprts"
-    if target_text in text:
-        # print("TRIGGER")
-        if not dummy:
-            # pyautogui.press('num1')
-            l.startOrSplit()
-            autosplit = True
-        if dupe_split:
-            block_screenshots = True
-            th.Timer(6, set_next_split).start()
-        else:
-            next_split = False
+
+    for target in target_text:
+        target = target.lower()
+        if target in text:
+            # print("TRIGGER")
+            if not dummy:
+                # pyautogui.press('num1')
+                l.startOrSplit()
+                autosplit = True
+            if dupe_split:
+                block_screenshots = True
+                th.Timer(6, set_next_split).start()
+            else:
+                next_split = False
     # break
 
 
@@ -303,40 +317,76 @@ def check_custom_prompt(prompt):
     check_text(prompt, img, False)
 
 
-def check_boss(dummy, spawn):
-    global autosplit, block_screenshots, next_split
+def check_boss_ocr(dummy, spawn):
+    img = take_screenshot(boss_name_box)
+    boss_names = ["insatiable", "avarokk"]
+    check_text(boss_names, img, dummy)
 
+# check_boss_ocr(False, False)
+
+
+def check_boss(dummy, spawn):
+    global autosplit, block_screenshots, next_split, boss_dead_buffer
+
+    # img2 = take_screenshot({"top": 950, "left": 620, "width": 660, "height": 56})
+    # {"top": 977, "left": 645, "width": 620, "height": 2}
+    # LEFT, TOP, RIGHT, BOTTOM
+    # img = img2.crop((25, 27, 647, 29))
     img = take_screenshot(boss_hp_box)
     # img.show()
-    light_orange = (1, 155, 155)
-    dark_orange = (25, 255, 255)
+    # light_orange = (1, 155, 155)
+    # dark_orange = (25, 255, 255)
+    # img1 = np.array(img)
+    # hsv_img = cv2.cvtColor(img1, cv2.COLOR_RGB2HSV)
+    # mask = cv2.inRange(hsv_img, light_orange, dark_orange)
+    # result = cv2.bitwise_and(img1, img1, mask=mask)
+    # img2 = Image.fromarray(result)
+    # img2.show()
     img1 = np.array(img)
-    hsv_img = cv2.cvtColor(img1, cv2.COLOR_RGB2HSV)
-    mask = cv2.inRange(hsv_img, light_orange, dark_orange)
-    result = cv2.bitwise_and(img1, img1, mask=mask)
-    # img = Image.fromarray(result)
-    # img.show()
+    im_bw = cv2.threshold(img1, 200, 255, cv2.THRESH_BINARY)[1]
+    img1 = Image.fromarray(im_bw)
+    red = 0
+    total = 0
+    for pixel in img1.getdata():
+        if pixel == (255, 0, 0):
+            red += 1
+        total += 1
+    # number_of_yellow_pix = np.sum(im_bw == (255, 0, 0))
+    # other_pixel = np.sum(im_bw != (255, 0, 0))
+    # ratio = number_of_yellow_pix / (number_of_yellow_pix + other_pixel)
+    ratio = red / total
+    print(ratio)
 
-    number_of_black_pix = np.sum(result == 0)
-    other_pixel = np.sum(result != 0)
-    ratio = number_of_black_pix / (number_of_black_pix + other_pixel)
-
-    # if less than 10% of the pixel are black the boss is spawned and more than 80% he's basically dead TODO: adjust value
+    # if less than 5% of the pixel are black the boss is spawned and more than 99% he's basically dead TODO: adjust value
     if spawn:
-        check = ratio < 0.1
-    else:
         check = ratio > 0.8
-
-    if check:
-        if not dummy:
-            # pyautogui.press('num1')
-            l.startOrSplit()
-            autosplit = True
-        if dupe_split:
-            block_screenshots = True
-            th.Timer(6, set_next_split).start()
+    else:
+        check = ratio < 0.05
+        if check:
+            if boss_dead_buffer > 0:
+                boss_dead_buffer -= 1
+                print("########BUFFER: " + str(boss_dead_buffer))
+                return None
+            print("###########DEAD#######################")
+            take_screenshot({"top": 0, "left": 0, "width": 1920, "height": 1080}).save("test2.png")
+            # img2.save("test2.png")
+            img.save("test1.png")
+            # img2 = Image.fromarray(hsv_img)
+            # img2.save("test.png")
         else:
-            next_split = False
+            boss_dead_buffer = 3
+
+    # if check:
+    #     if not dummy:
+    #         # pyautogui.press('num1')
+    #         l.startOrSplit()
+    #         autosplit = True
+    #     if dupe_split:
+    #         block_screenshots = True
+    #         th.Timer(6, set_next_split).start()
+    #     else:
+    #         next_split = False
+# check_boss(True, True)
 
 
 def check_wipe_screen():
@@ -352,28 +402,47 @@ def check_joining():
 
 # returns whether the message in the prompt box was made by the player e.g. created orbs
 def is_player_prompt(img: Image):
+    # TODO: CHECK FOR GREEN IN NAME INSTEAD OF TRIANGLE
+    light_green = (25, 30, 100)
+    dark_green = (85, 86, 160)
+    img1 = np.array(img)
+    hsv_img = cv2.cvtColor(img1, cv2.COLOR_RGB2HSV)
+    # test = Image.fromarray(hsv_img)
+    # test.save("green.png")
+    # return False
+    mask = cv2.inRange(hsv_img, light_green, dark_green)
+    result = cv2.bitwise_and(img1, img1, mask=mask)
+
+    number_of_black_pix = np.sum(result == 0)
+    other_pixel = np.sum(result != 0)
+    ratio = number_of_black_pix / (number_of_black_pix + other_pixel)
+    print(ratio)
+
+    return ratio < 0.9
+    # test = Image.fromarray(result)
+    # test.show()
     # TODO: change the 7 to work for non 1080p monitors
-    triangle = img.crop((7, 12, prompt_box["width"] / 20, prompt_box["height"])).convert('L')
+    # triangle = img.crop((7, 12, prompt_box["width"] / 20, prompt_box["height"])).convert('L')
     # triangle.show()
     # img = img.convert('L')
-    img = np.array(triangle)
+    # img = np.array(triangle)
     # TODO: test other thresh modes
-    im_bw = cv2.threshold(img, 100, 255, cv2.THRESH_OTSU)[1]
+    # im_bw = cv2.threshold(img, 100, 255, cv2.THRESH_OTSU)[1]
     # img = Image.fromarray(im_bw)
     # img.show()
     # ratio = get_bw_ratio(img)
     # print(f"bw ratio: {ratio}")
     # return ratio > 0.2
-    canny = cv2.Canny(im_bw, 240, 255)
-    contours, hier = cv2.findContours(canny, 1, 2)
-    for cnt in contours:
-        approx = cv2.approxPolyDP(cnt, 0.02 * cv2.arcLength(cnt, True), True)
-        print(f"approx: {len(approx)}")
-        if len(approx) == 3:
-            cv2.drawContours(im_bw, [cnt], 0, (0, 255, 0), 2)
-            tri = approx
-    img = Image.fromarray(im_bw)
-    img.show()
+    # canny = cv2.Canny(im_bw, 240, 255)
+    # contours, hier = cv2.findContours(canny, 1, 2)
+    # for cnt in contours:
+    #     approx = cv2.approxPolyDP(cnt, 0.02 * cv2.arcLength(cnt, True), True)
+    #     print(f"approx: {len(approx)}")
+    #     if len(approx) == 3:
+    #         cv2.drawContours(im_bw, [cnt], 0, (0, 255, 0), 2)
+    #         tri = approx
+    # img = Image.fromarray(im_bw)
+    # img.show()
     # using a findContours() function
     # _, thrash = cv2.threshold(img, 240, 255, cv2.CHAIN_APPROX_NONE)
     # contours, _ = cv2.findContours(thrash, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
@@ -431,16 +500,32 @@ def test():
 
 
 def monitor_setup():
+    global new_objective_box, joining_allies_box, prompt_box, objective_complete_box, mission_complete_box, boss_hp_box
     main_monitor = get_main_monitor()
     width = main_monitor.width
     height = main_monitor.height
     x_modifier = width / 1920
     y_modifier = height / 1080
-    for box in screenshot_boxes:
-        box["left"] = int(box["left"] * x_modifier)
-        box["top"] = int(box["top"] * y_modifier)
-        box["width"] = int(box["width"] * x_modifier)
-        box["height"] = int(box["height"] * y_modifier)
+    # if not 1080p it will apply 1440p measurements
+    if width != 1920 and height != 1080:
+        enhance_list = [light_fading_box, restricted_box]
+        for box in enhance_list:
+            box["left"] = int(box["left"] * x_modifier)
+            box["top"] = int(box["top"] * y_modifier)
+            box["width"] = int(box["width"] * x_modifier)
+            box["height"] = int(box["height"] * y_modifier)
+        # new objective 1440p
+        new_objective_box = {"top": 380, "left": 373, "width": 266, "height": 40}
+        # boss hp 1440p
+        boss_hp_box = {"top": 1275, "left": 943, "width": 13, "height": 6}
+        # joining allies 1440p
+        joining_allies_box = {"top": 1057, "left": 1078, "width": 186, "height": 37}
+        # prompt 1440p
+        prompt_box = {"top": 1070, "left": 190, "width": 493, "height": 46}
+        # objective complete 1440p
+        objective_complete_box = {"top": 380, "left": 335, "width": 350, "height": 40}
+        # mission complete
+        mission_complete_box = {"top": 120, "left": 380, "width": 880, "height": 93}
     print(screenshot_boxes)
 
 
