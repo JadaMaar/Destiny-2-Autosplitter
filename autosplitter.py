@@ -1,7 +1,6 @@
 import threading as th
 import time
 from datetime import datetime
-from socket import socket
 
 import mss
 import numpy as np
@@ -40,7 +39,8 @@ mission_complete_box = {"top": 70, "left": 190, "width": 660, "height": 70}
 # boss hp bar
 # boss_hp_box = {"top": 978, "left": 645, "width": 10, "height": 5}
 # test
-boss_hp_box = {"top": 977, "left": 645, "width": 620, "height": 2}
+boss_hp_box = {"top": 976, "left": 645, "width": 620, "height": 2}
+boss_hp_box_whole = {"top": 968, "left": 640, "width": 645, "height": 28}
 boss_name_box = {"top": 987, "left": 645, "width": 620, "height": 25}
 
 # wipe screen
@@ -80,10 +80,24 @@ reset = False
 autosplit = False
 
 boss_dead_buffer = 3
+server_started = False
+
+
+def setup_livesplit_server():
+    global server_started
+    import customtkinter
+    while True:
+        try:
+            l.getSocket()
+            server_started = True
+            break
+        except:
+            print("Connection failed. Please start the livesplit server")
+            time.sleep(1)
 
 
 def start_auto_splitter_thread(splits):
-    split_thread = th.Thread(target=start_auto_splitter, args=(splits,))
+    split_thread = th.Thread(target=start_auto_splitter, args=(splits,), daemon=True)
     split_thread.start()
 
 
@@ -120,33 +134,33 @@ def start_auto_splitter(splits):
                 print("CURRENT SPLIT: " + str(current_split))
                 split_index += 1
                 if len(splits) > split_index:
-                    dupe_split = current_split[0] == splits[split_index][0]
-                    print("NEXT SPLIT: " + str(splits[split_index][0]))
+                    dupe_split = current_split.split_name == splits[split_index].split_name
+                    print("NEXT SPLIT: " + str(splits[split_index].split_name))
                 else:
                     dupe_split = False
             else:
                 break
         if not block_screenshots:
-            if current_split[0] == "New Objective":
-                check_new_objective(current_split[1])
-            elif current_split[0] == "Objective Complete":
-                check_objective_complete(current_split[1])
-            elif current_split[0] == "Respawning Restricted":
-                check_darkness_zone(current_split[1])
-            elif current_split[0] == "Access Granted":
-                check_access_granted(current_split[1])
-            elif current_split[0] == "Mission Completed":
-                check_mission_complete(current_split[1])
-            elif current_split[0] == "Boss Spawn":
-                check_boss(current_split[1], True)
-            elif current_split[0] == "Boss Dead":
-                check_boss(current_split[1], False)
-            elif current_split[0] == "Wipe Screen":
+            if current_split.split_name == "New Objective":
+                check_new_objective(current_split.dummy)
+            elif current_split.split_name == "Objective Complete":
+                check_objective_complete(current_split.dummy)
+            elif current_split.split_name == "Respawning Restricted":
+                check_darkness_zone(current_split.dummy)
+            elif current_split.split_name == "Access Granted":
+                check_access_granted(current_split.dummy)
+            elif current_split.split_name == "Mission Completed":
+                check_mission_complete(current_split.dummy)
+            elif current_split.split_name == "Boss Spawn":
+                check_boss(current_split.dummy, True)
+            elif current_split.split_name == "Boss Dead":
+                check_boss(current_split.dummy, False)
+            elif current_split.split_name == "Wipe Screen":
                 check_wipe_screen()
-            elif current_split[0] == "Joining Allies":
+            elif current_split.split_name == "Joining Allies":
                 check_joining()
             else:
-                check_custom_prompt(current_split[0])
+                check_custom_prompt(current_split.split_name, current_split.dummy)
             next_time = datetime.now().timestamp()
             delta = (next_time - current_time)
             if delta < (1 / fps_cap):
@@ -162,8 +176,8 @@ def start_auto_splitter(splits):
                 avg_fps = (total / count)
             # print(avg_fps)
             # print(f"CPU usage: {psutil.cpu_percent()}")
-    # if is_running:
-    #     start_auto_splitter_thread(splits_copy)
+    if is_running:
+        start_auto_splitter_thread(splits_copy)
 
 
 def stop_auto_splitter():
@@ -232,7 +246,7 @@ def check_text(target_text, img, dummy):
     # text = tesserocr.image_to_text(img, oem=3)
     text = str(text).lower()
     # text = spell(text)
-    print("TEXT: " + str(text))
+    # print("TEXT: " + str(text))
     # text = "njogrsnognoprts"
 
     for target in target_text:
@@ -310,11 +324,11 @@ def check_access_granted(dummy):
     check_custom_prompt("Access Granted")
 
 
-def check_custom_prompt(prompt):
+def check_custom_prompt(prompt, dummy):
     img = take_screenshot(prompt_box)
     # if not is_player_prompt(img):
     #     print("CHECK")
-    check_text(prompt, img, False)
+    check_text(prompt, img, dummy)
 
 
 def check_boss_ocr(dummy, spawn):
@@ -333,35 +347,46 @@ def check_boss(dummy, spawn):
     # LEFT, TOP, RIGHT, BOTTOM
     # img = img2.crop((25, 27, 647, 29))
     img = take_screenshot(boss_hp_box)
-    # img.show()
-    # light_orange = (1, 155, 155)
-    # dark_orange = (25, 255, 255)
-    # img1 = np.array(img)
-    # hsv_img = cv2.cvtColor(img1, cv2.COLOR_RGB2HSV)
-    # mask = cv2.inRange(hsv_img, light_orange, dark_orange)
-    # result = cv2.bitwise_and(img1, img1, mask=mask)
-    # img2 = Image.fromarray(result)
-    # img2.show()
-    img1 = np.array(img)
-    im_bw = cv2.threshold(img1, 200, 255, cv2.THRESH_BINARY)[1]
-    img1 = Image.fromarray(im_bw)
-    red = 0
-    total = 0
-    for pixel in img1.getdata():
-        if pixel == (255, 0, 0):
-            red += 1
-        total += 1
-    # number_of_yellow_pix = np.sum(im_bw == (255, 0, 0))
-    # other_pixel = np.sum(im_bw != (255, 0, 0))
-    # ratio = number_of_yellow_pix / (number_of_yellow_pix + other_pixel)
-    ratio = red / total
-    print(ratio)
 
-    # if less than 5% of the pixel are black the boss is spawned and more than 99% he's basically dead TODO: adjust value
+    light_orange = (14, 155, 155)
+    dark_orange = (25, 249, 255)
+    img1 = np.array(img)
+    # hsv_img = cv2.cvtColor(img1, cv2.COLOR_RGB2HSV)
+    # Image.fromarray(hsv_img).save("hsv_boss.png")
+
+    M = img1.shape[0] // 1
+    N = img1.shape[1] // 10
+    tiles = [img1[x:x + M, y:y + N] for x in range(0, img1.shape[0], M) for y in range(0, img1.shape[1], N)]
+
+    # counts boss hp in increments of 10%
+    counter = 0
+    prev_ratio = 0
+    all_ratio = []
+    for tile in tiles:
+        hsv_img = cv2.cvtColor(tile, cv2.COLOR_RGB2HSV)
+        mask = cv2.inRange(hsv_img, light_orange, dark_orange)
+        result = cv2.bitwise_and(tile, tile, mask=mask)
+        number_of_black_pix = np.sum(result == 0)
+        other_pixel = np.sum(result != 0)
+        ratio = number_of_black_pix / (number_of_black_pix + other_pixel)
+        all_ratio.append(ratio)
+        if ratio == 0:
+            if prev_ratio != 0:
+                break
+            counter += 1
+        prev_ratio = ratio
+        # ratio = yellow / total
+        # print(f"tile ratio: {ratio}")
+        # Image.fromarray(tile).show()
+
+    # if less than 5% of the pixel are black the boss is spawned and more than 99% he's basically dead
+    # with boss_hp_box_whole full hp + immune = 24% and full hp + damageable = 48%
+    # TODO: adjust value
+    # print(f"counter: {counter}")
     if spawn:
-        check = ratio > 0.8
+        check = counter > 8
     else:
-        check = ratio < 0.05
+        check = counter < 1 and all_ratio[0] > 0.99
         if check:
             if boss_dead_buffer > 0:
                 boss_dead_buffer -= 1
@@ -376,16 +401,16 @@ def check_boss(dummy, spawn):
         else:
             boss_dead_buffer = 3
 
-    # if check:
-    #     if not dummy:
-    #         # pyautogui.press('num1')
-    #         l.startOrSplit()
-    #         autosplit = True
-    #     if dupe_split:
-    #         block_screenshots = True
-    #         th.Timer(6, set_next_split).start()
-    #     else:
-    #         next_split = False
+    if check:
+        if not dummy:
+            # pyautogui.press('num1')
+            l.startOrSplit()
+            autosplit = True
+        if dupe_split:
+            block_screenshots = True
+            th.Timer(6, set_next_split).start()
+        else:
+            next_split = False
 # check_boss(True, True)
 
 
@@ -459,43 +484,37 @@ def get_main_monitor():
 
 
 def get_hotkeys():
-    global autosplit, split_index
-    livesplit = l.getSocket()# socket()
-    # livesplit.connect(("localhost", 16834))
-    # livesplit.send("initgametime\r\n".encode())
-    # livesplit.send("setcomparison gametime\r\n".encode())
-    # livesplit.send("starttimer\r\n".encode())
-    # livesplit.send("pausegametime\r\n".encode())
-    # time.sleep(3)
-    # livesplit.send("startorsplit\r\n".encode())
-    # ls_time = livesplit.recv(1024).decode()[:-2]
-    # print("reply: " + ls_time)
-    # Listen for events
-    # livesplit.settimeout(1)
+    global autosplit, split_index, l, next_split
+    import time
+    # TODO: kill thread after application is closed
+    ls_socket = l.getSocket()# socket()
     prev_index = -1
     while True:
         try:
-            livesplit.send("getsplitindex\r\n".encode())
-            current_index = livesplit.recv(1024).decode()[:-2]
+            ls_socket.send("getsplitindex\r\n".encode())
+            current_index = int(ls_socket.recv(1024).decode()[:-2])
+            index_change = current_index != prev_index
             if not autosplit:
-                if current_index == -1:
-                    split_index = 0
-                if current_index != prev_index:
+                # if current_index == -1:
+                #     split_index = 0
+                #     next_split = False
+                if current_index != -1 and index_change:
+                    print("MANUAL CHANGE")
+                    split_index = current_index
                     print(current_index)
-                    prev_index = current_index
-                    split_index += 1
-            # print("STUFF HAPPENS")
-            # if data:
-            #     event = data
-            #     if "split" in event:
-            #         print("Split triggered!")
+                    next_split = False
+            else:
+                autosplit = False
+            if index_change:
+                prev_index = current_index
+            time.sleep(0.1)
         except:
             print("timeout")
             pass
 
 
 def test():
-    thread = th.Thread(target=get_hotkeys)
+    thread = th.Thread(target=get_hotkeys, daemon=True)
     thread.start()
 
 
@@ -529,28 +548,8 @@ def monitor_setup():
     print(screenshot_boxes)
 
 
-# handle hotkeys
-def handle_split():
-    global split_index
-    # if event.name == "num 1":
-    print("NUMPAD 1")
-    livesplit = socket()
-    livesplit.connect(("localhost", 16834))
-    livesplit.send("getsplitindex\r\n".encode())
-    ls_index = livesplit.recv(1024).decode()[:-2]
-    print("reply: " + ls_index)
-    livesplit.close()
-    # not incrementing if result is 0 or -1
-    # 0 means the timer was just started and -1 that the splits got reset by pressing split button after a finished run
-    if ls_index not in ["0", "-1"]:
-        split_index += 1
-
-
-def handle_reset():
-    global reset
-    reset = True
-    print("NUMPAD 3")
-
-
-keyboard.add_hotkey("num 1", handle_split)
-keyboard.add_hotkey("num 3", handle_reset)
+class Split:
+    def __init__(self, name, split_name, dummy):
+        self.name = name
+        self.split_name = split_name
+        self.dummy = dummy
