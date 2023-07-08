@@ -1,12 +1,10 @@
-import time
 from tkinter import filedialog as fd
+
 import customtkinter
+from PIL import Image
+
 # import autosplitter
 import autosplitter
-import threading
-import psutil
-import cv2
-from PIL import Image
 
 
 def close():
@@ -18,7 +16,7 @@ def close():
 def add_split(name, split, is_dummy):
     stop_auto_splitter()
 
-    new_split = splitter.Split(name, split, is_dummy)
+    new_split = autosplitter.Split(name, split, is_dummy)
     if split == "Boss Spawn":
         new_split.set_spawn(True)
     elif split == "Boss Dead":
@@ -198,7 +196,7 @@ run_splits = []
 split_text_boxes = []
 
 # setup splitter
-autosplitter = splitter.AutoSplitter(run_splits, split_text_boxes)
+autosplitter = autosplitter.AutoSplitter(run_splits, split_text_boxes)
 autosplitter.setup_livesplit_server()
 # autosplitter.monitor_setup()
 # autosplitter.setup_livesplit_server()
