@@ -4,6 +4,8 @@ import customtkinter
 import autosplitter
 import threading
 import psutil
+import cv2
+from PIL import Image
 
 
 def close():
@@ -182,86 +184,88 @@ def screenshot():
     autosplitter.take_screenshot({"top": top, "left": left, "width": width, "height": height}).show()
 
 
-if __name__ == "__main__":
-    import cv2
-    from PIL import Image
-    # os.environ['OMP_THREAD_LIMIT'] = '1'
+# if __name__ == "__main__":
 
-    run_splits = []
-    split_text_boxes = []
+# os.environ['OMP_THREAD_LIMIT'] = '1'
 
-    autosplitter.monitor_setup()
-    autosplitter.test()
+run_splits = []
+split_text_boxes = []
 
-    # setup UI
-    customtkinter.set_appearance_mode("Dark")
-    customtkinter.set_default_color_theme("blue")
+# setup splitter
+autosplitter.monitor_setup()
+autosplitter.setup_livesplit_server()
+autosplitter.set_split_ui(split_text_boxes)
+autosplitter.test()
 
-    app = customtkinter.CTk()
-    app.geometry("400x650")
-    app.title("Destiny 2 Autosplitter")
-    # app.iconbitmap("WLZ.ico")
-    app.resizable(False, False)
-    img = Image.open("test2.png")
-    my_image = customtkinter.CTkImage(light_image=img,
-                                      dark_image=img,
-                                      size=(400, 650))
-    bg = customtkinter.CTkLabel(app, image=my_image, text="")
-    # bg.grid(row=0, column=0, columnspan=2, rowspan=9)
+# setup UI
+customtkinter.set_appearance_mode("Dark")
+customtkinter.set_default_color_theme("blue")
 
-    # title_label = customtkinter.CTkLabel(app, text="Autosplitter :D")
-    # title_label.grid(row=0, column=0, padx=10, pady=10, columnspan=2)
-    fps_cap = customtkinter.CTkTextbox(app, width=150, height=2, corner_radius=0)
-    fps_cap.grid(row=0, column=0, pady=10)
+app = customtkinter.CTk()
+app.geometry("400x650")
+app.title("Destiny 2 Autosplitter")
+# app.iconbitmap("WLZ.ico")
+app.resizable(False, False)
+img = Image.open("test2.png")
+my_image = customtkinter.CTkImage(light_image=img,
+                                  dark_image=img,
+                                  size=(400, 650))
+bg = customtkinter.CTkLabel(app, image=my_image, text="")
+# bg.grid(row=0, column=0, columnspan=2, rowspan=9)
 
-    fps_cap_btn = customtkinter.CTkButton(app, text="TEST", command=lambda: cap_fps())
-    fps_cap_btn.grid(row=0, column=1, pady=10)
+# title_label = customtkinter.CTkLabel(app, text="Autosplitter :D")
+# title_label.grid(row=0, column=0, padx=10, pady=10, columnspan=2)
+fps_cap = customtkinter.CTkTextbox(app, width=150, height=2, corner_radius=0)
+fps_cap.grid(row=0, column=0, pady=10)
 
-    start = customtkinter.CTkButton(app, text="Start Autosplitter",
-                                    command=lambda: start_auto_splitter(run_splits.copy()))
-    start.grid(row=1, column=0, pady=10)
+fps_cap_btn = customtkinter.CTkButton(app, text="TEST", command=lambda: cap_fps())
+fps_cap_btn.grid(row=0, column=1, pady=10)
 
-    stop = customtkinter.CTkButton(app, text="Stop Autosplitter", command=lambda: stop_auto_splitter())
-    stop.grid(row=1, column=1, pady=10)
+start = customtkinter.CTkButton(app, text="Start Autosplitter",
+                                command=lambda: start_auto_splitter(run_splits.copy()))
+start.grid(row=1, column=0, pady=10)
 
-    save = customtkinter.CTkButton(app, text="Save Splits", command=lambda: save_splits())
-    save.grid(row=2, column=0, pady=10)
+stop = customtkinter.CTkButton(app, text="Stop Autosplitter", command=lambda: stop_auto_splitter())
+stop.grid(row=1, column=1, pady=10)
 
-    load = customtkinter.CTkButton(app, text="Load Splits", command=lambda: load_splits())
-    load.grid(row=2, column=1, pady=10)
+save = customtkinter.CTkButton(app, text="Save Splits", command=lambda: save_splits())
+save.grid(row=2, column=0, pady=10)
 
-    split_option = customtkinter.CTkOptionMenu(app,
-                                               values=["New Objective", "Objective Complete", "Respawning Restricted",
-                                                       "Wipe Screen", "Joining Allies",
-                                                       "Boss Spawn", "Boss Dead", "Mission Completed", "Custom"],
-                                               command=option_menu_callback)
-    split_option.grid(row=3, column=0, columnspan=2)
+load = customtkinter.CTkButton(app, text="Load Splits", command=lambda: load_splits())
+load.grid(row=2, column=1, pady=10)
 
-    split_text = customtkinter.CTkTextbox(app, width=400, height=2, corner_radius=0)
-    split_text.grid(row=4, column=0, pady=10, columnspan=2)
+split_option = customtkinter.CTkOptionMenu(app,
+                                           values=["New Objective", "Objective Complete", "Respawning Restricted",
+                                                   "Wipe Screen", "Joining Allies",
+                                                   "Boss Spawn", "Boss Dead", "Mission Completed", "Custom"],
+                                           command=option_menu_callback)
+split_option.grid(row=3, column=0, columnspan=2)
 
-    option_menu_callback(split_option.get())
+split_text = customtkinter.CTkTextbox(app, width=400, height=2, corner_radius=0)
+split_text.grid(row=4, column=0, pady=10, columnspan=2)
 
-    add = customtkinter.CTkButton(app, text="Add Split", command=lambda: manual_add_split())
-    add.grid(row=5, column=0, pady=10)
+option_menu_callback(split_option.get())
 
-    remove = customtkinter.CTkButton(app, text="Remove Last Split", command=lambda: remove_split())
-    remove.grid(row=5, column=1, pady=10)
+add = customtkinter.CTkButton(app, text="Add Split", command=lambda: manual_add_split())
+add.grid(row=5, column=0, pady=10)
 
-    dummy = customtkinter.CTkCheckBox(app, text="dummy")
-    dummy.grid(row=6, column=0, pady=10)
+remove = customtkinter.CTkButton(app, text="Remove Last Split", command=lambda: remove_split())
+remove.grid(row=5, column=1, pady=10)
 
-    name = customtkinter.CTkCheckBox(app, text="name")
-    name.grid(row=6, column=1, pady=10)
+dummy = customtkinter.CTkCheckBox(app, text="dummy")
+dummy.grid(row=6, column=0, pady=10)
 
-    split_container = customtkinter.CTkScrollableFrame(app, width=200, height=200)
-    split_container.grid(row=7, column=0, pady=10, columnspan=2)
+name = customtkinter.CTkCheckBox(app, text="name")
+name.grid(row=6, column=1, pady=10)
 
-    box_text = customtkinter.CTkTextbox(app, width=400, height=2, corner_radius=0)
-    box_text.grid(row=8, column=0, pady=10, columnspan=2)
+split_container = customtkinter.CTkScrollableFrame(app, width=200, height=200)
+split_container.grid(row=7, column=0, pady=10, columnspan=2)
 
-    screenshot_button = customtkinter.CTkButton(app, text="Screenshot", command=lambda: screenshot())
-    screenshot_button.grid(row=9, column=0, pady=10, columnspan=2)
+box_text = customtkinter.CTkTextbox(app, width=400, height=2, corner_radius=0)
+box_text.grid(row=8, column=0, pady=10, columnspan=2)
 
-    app.protocol("WM_DELETE_WINDOW", lambda: close())
-    app.mainloop()
+screenshot_button = customtkinter.CTkButton(app, text="Screenshot", command=lambda: screenshot())
+screenshot_button.grid(row=9, column=0, pady=10, columnspan=2)
+
+app.protocol("WM_DELETE_WINDOW", lambda: close())
+app.mainloop()

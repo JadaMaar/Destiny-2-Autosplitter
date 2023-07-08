@@ -82,6 +82,8 @@ autosplit = False
 boss_dead_buffer = 3
 server_started = False
 
+splits_ui = []
+
 
 def setup_livesplit_server():
     global server_started
@@ -109,6 +111,11 @@ def read_image(q: mp.Queue):
             check_text("NEW", img, False)
 
 
+def update_split_ui(index: int):
+    global splits_ui
+    splits_ui[index].configure(fg_color="green")
+
+
 def start_auto_splitter(splits):
     global is_running, next_split, dupe_split, delta, avg_fps, split_index, reset, boss_dead_buffer
     is_running = True
@@ -131,6 +138,7 @@ def start_auto_splitter(splits):
             if len(splits) > split_index:
                 boss_dead_buffer = 3
                 current_split = splits[split_index]
+                update_split_ui(split_index)
                 print("CURRENT SPLIT: " + str(current_split))
                 split_index += 1
                 if len(splits) > split_index:
@@ -484,7 +492,7 @@ def get_main_monitor():
 
 
 def get_hotkeys():
-    global autosplit, split_index, l, next_split
+    global autosplit, split_index, l, next_split, reset
     import time
     # TODO: kill thread after application is closed
     ls_socket = l.getSocket()# socket()
@@ -494,13 +502,20 @@ def get_hotkeys():
             ls_socket.send("getsplitindex\r\n".encode())
             current_index = int(ls_socket.recv(1024).decode()[:-2])
             index_change = current_index != prev_index
-            if not autosplit:
-                # if current_index == -1:
-                #     split_index = 0
-                #     next_split = False
-                if current_index != -1 and index_change:
+            if not autosplit and index_change:
+                # index 0 or -1 meaning it just started or ended
+                if current_index <= 0:
+                    print("RESET")
+                    # split_index = 0
+                    # next_split = False
+                    reset = True
+                elif current_index < prev_index:
                     print("MANUAL CHANGE")
-                    split_index = current_index
+                    split_index -= 1
+                    print(current_index)
+                    next_split = False
+                else:
+                    split_index += 1
                     print(current_index)
                     next_split = False
             else:
@@ -553,3 +568,8 @@ class Split:
         self.name = name
         self.split_name = split_name
         self.dummy = dummy
+
+
+def set_split_ui(split_text_boxes):
+    global splits_ui
+    splits_ui = split_text_boxes
