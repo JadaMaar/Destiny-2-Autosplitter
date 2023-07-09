@@ -10,6 +10,8 @@ import cv2
 import livesplit
 from customtkinter import ThemeManager
 
+import gui
+
 
 class Split:
     def __init__(self, name, split_name, dummy, spawn=None):
@@ -49,7 +51,6 @@ class AutoSplitter:
         self._block_screenshots = False
         self._dupe_split = False
         self._auto_split = False
-        # TODO: add buffer usage if needed
         self._boss_dead_buffer = 3
         self._fps_cap = 100
         self._screen_checker = ScreenChecker()
@@ -57,14 +58,16 @@ class AutoSplitter:
         self._livesplit = livesplit.Livesplit()
 
     def setup_livesplit_server(self):
-        while True:
-            try:
-                self._livesplit.getSocket()
-                th.Thread(target=self.get_hotkeys, daemon=True).start()
-                break
-            except:
-                print("Connection failed. Please start the livesplit server")
-                time.sleep(1)
+        try:
+            self._livesplit.getSocket()
+            connected = True
+        except:
+            print("Connection failed. Please start the livesplit server")
+            connected = False
+            #time.sleep(1)
+        if connected:
+            th.Thread(target=self.get_hotkeys, daemon=True).start()
+        return connected
 
     def start_auto_splitter(self):
         split_thread = th.Thread(target=self._start_auto_splitter, daemon=True)
@@ -99,7 +102,7 @@ class AutoSplitter:
                     # update current split
                     self._current_split = self._split_list[self._split_index]
                     self.update_split_ui()
-                    print("CURRENT SPLIT: " + str(self._current_split))
+                    print("CURRENT SPLIT: " + str(self._current_split.split_name))
                     self._split_index += 1
 
                     # check if the next split matches the current one to avoid double splitting
@@ -113,16 +116,15 @@ class AutoSplitter:
             if not self._block_screenshots:
                 split_triggered = self._screen_checker.take_screenshot(split=self._current_split)
                 if split_triggered:
-                    # split if not dummy
-                    if not self._current_split.dummy:
-                        self._livesplit.startOrSplit()
-                        self._auto_split = True
-                    # delay next split in case of dupe to prevent double splitting
-                    if self._dupe_split:
-                        self._block_screenshots = True
-                        th.Timer(6, self.set_next_split).start()
+                    if self._current_split.split_name == "Boss Dead":
+                        if self._boss_dead_buffer <= 0:
+                            self.trigger_split()
+                        else:
+                            self._boss_dead_buffer -= 1
                     else:
-                        self._next_split = False
+                        self.trigger_split()
+                else:
+                    self._boss_dead_buffer = 3
 
                 # cap frames
                 next_time = datetime.now().timestamp()
@@ -145,6 +147,18 @@ class AutoSplitter:
     def set_next_split(self):
         self._next_split = False
         self._block_screenshots = False
+
+    def trigger_split(self):
+        # split if not dummy
+        if not self._current_split.dummy:
+            self._livesplit.startOrSplit()
+            self._auto_split = True
+        # delay next split in case of dupe to prevent double splitting
+        if self._dupe_split:
+            self._block_screenshots = True
+            th.Timer(6, self.set_next_split).start()
+        else:
+            self._next_split = False
 
     def update_split_ui(self):
         # TODO: change color in ui
@@ -187,7 +201,8 @@ class AutoSplitter:
                 time.sleep(0.1)
             except:
                 print("timeout")
-                pass
+                gui.ServerErrorWindow(self.setup_livesplit_server).grab_set()
+                return
 
 
 class ScreenChecker:
@@ -205,6 +220,7 @@ class ScreenChecker:
         self._mission_complete_box = {"top": 70, "left": 190, "width": 660, "height": 70}
         # boss hp bar
         self._boss_hp_box = {"top": 976, "left": 645, "width": 620, "height": 2}
+        self._boss_name_box = {"top": 987, "left": 645, "width": 620, "height": 25}
         # wipe screen
         self._light_fading_box = {"top": 100, "left": 400, "width": 200, "height": 70}
         # joining allies
@@ -276,8 +292,8 @@ class ScreenChecker:
             other_pixel = np.sum(result != 0)
             ratio = number_of_black_pix / (number_of_black_pix + other_pixel)
             all_ratio.append(ratio)
-            if ratio == 0:
-                if prev_ratio != 0:
+            if ratio < 0.1:
+                if prev_ratio >= 0.1:
                     break
                 counter += 1
             prev_ratio = ratio
@@ -291,7 +307,19 @@ class ScreenChecker:
         # print(f"counter: {counter}")
         if split.spawn:
             check = counter > 8
+            if check:
+                sct_img = self._sct.grab(self._boss_name_box)
+                # convert to PIL image
+                img = Image.new("RGB", sct_img.size)
+                pixels = zip(sct_img.raw[2::4], sct_img.raw[1::4], sct_img.raw[::4])
+                img.putdata(list(pixels))
+                self._api.SetImage(img)
+                text = self._api.GetUTF8Text().replace(" ", "")
+                print(f"length: {len(text)}")
+                # more than 5 letters make it more likely for it to be a boss name instead of random environment
+                if len(text) < 5:
+                    check = False
+
         else:
             check = counter < 1 and all_ratio[0] > 0.99
         return check
-

@@ -1,14 +1,12 @@
 from tkinter import filedialog as fd
 
 import customtkinter
-from PIL import Image
-
-# import autosplitter
 import autosplitter
+import gui
 
 
 def close():
-    autosplitter.stop_auto_splitter()
+    auto_splitter.stop_auto_splitter()
     app.quit()
     app.destroy()
 
@@ -59,7 +57,7 @@ def manual_add_split():
     print(is_dummy)
     splitname = ""
     if name.get() == 1:
-        dialog = customtkinter.CTkInputDialog(text="Splitname:", title="Set Splitname")
+        dialog = gui.DialogWindow(text="Splitname:", title="Set Splitname")
         splitname = dialog.get_input()
     if command != "Custom":
         add_split(splitname, command, is_dummy)
@@ -68,7 +66,7 @@ def manual_add_split():
 
 
 def save_splits():
-    dialog = customtkinter.CTkInputDialog(text="Save as:", title="Save")
+    dialog = gui.DialogWindow(text="Save as:", title="Save")
     input_value = dialog.get_input()
     # print(dialog._user_input)
     if input_value is not None:
@@ -105,13 +103,13 @@ def option_menu_callback(choice):
 
 def start_auto_splitter(splits):
     print(start.cget("fg_color"))
-    autosplitter.stop_auto_splitter()
-    autosplitter.start_auto_splitter()
+    auto_splitter.stop_auto_splitter()
+    auto_splitter.start_auto_splitter()
     start.configure(fg_color="green")
 
 
 def stop_auto_splitter():
-    autosplitter.stop_auto_splitter()
+    auto_splitter.stop_auto_splitter()
     start.configure(fg_color="#1F6AA5")
 
 
@@ -195,9 +193,8 @@ def stop_auto_splitter():
 run_splits = []
 split_text_boxes = []
 
-# setup splitter
-autosplitter = autosplitter.AutoSplitter(run_splits, split_text_boxes)
-autosplitter.setup_livesplit_server()
+# while not server_connected:
+#     server_connected = auto_splitter.setup_livesplit_server()
 # autosplitter.monitor_setup()
 # autosplitter.setup_livesplit_server()
 # autosplitter.set_split_ui(split_text_boxes)
@@ -210,13 +207,22 @@ customtkinter.set_default_color_theme("blue")
 app = customtkinter.CTk()
 app.geometry("400x500")
 app.title("Destiny 2 Autosplitter")
+
+# setup splitter
+auto_splitter = autosplitter.AutoSplitter(run_splits, split_text_boxes)
+server_connected = auto_splitter.setup_livesplit_server()
+if not server_connected:
+    pop_up = gui.ServerErrorWindow(auto_splitter.setup_livesplit_server, app)
+    pop_up.grab_set()
+
+
 # app.iconbitmap("WLZ.ico")
 app.resizable(False, False)
-img = Image.open("test2.png")
-my_image = customtkinter.CTkImage(light_image=img,
-                                  dark_image=img,
-                                  size=(400, 650))
-bg = customtkinter.CTkLabel(app, image=my_image, text="")
+# img = Image.open("test2.png")
+# my_image = customtkinter.CTkImage(light_image=img,
+#                                   dark_image=img,
+#                                   size=(400, 650))
+# bg = customtkinter.CTkLabel(app, image=my_image, text="")
 # bg.grid(row=0, column=0, columnspan=2, rowspan=9)
 
 # title_label = customtkinter.CTkLabel(app, text="Autosplitter :D")
