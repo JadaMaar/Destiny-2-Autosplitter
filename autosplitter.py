@@ -111,8 +111,7 @@ class AutoSplitter:
                         print("NEXT SPLIT: " + str(self._split_list[self._split_index].split_name))
                     else:
                         self._dupe_split = False
-                else:
-                    break
+
             if not self._block_screenshots:
                 split_triggered = self._screen_checker.take_screenshot(split=self._current_split)
                 if split_triggered:
@@ -179,6 +178,7 @@ class AutoSplitter:
             try:
                 ls_socket.send("getsplitindex\r\n".encode())
                 current_index = int(ls_socket.recv(1024).decode()[:-2])
+                print(self._split_index)
                 index_change = current_index != prev_index
                 if not self._auto_split and index_change:
                     # index 0 or -1 meaning it just started or ended
@@ -187,11 +187,11 @@ class AutoSplitter:
                         self._reset = True
                     elif current_index < prev_index:
                         print("MANUAL CHANGE")
-                        self._split_index -= 1
+                        self._split_index -= 2
                         print(current_index)
                         self._next_split = False
                     else:
-                        self._split_index += 1
+                        # self._split_index += 1
                         print(current_index)
                         self._next_split = False
                 else:
