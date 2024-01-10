@@ -9,6 +9,7 @@ import numpy as np
 import cv2
 import livesplit
 from customtkinter import ThemeManager
+from screeninfo import get_monitors
 
 import gui
 
@@ -22,7 +23,7 @@ class Split:
         # set True for boss spawn and False for boss death split
         self.spawn = spawn
         split_to_text_map = {
-            "New Objective": "NEW OBJECTIVE",
+            "New Objective": "NEW",
             "Objective Complete": "COMPLETE",
             "Respawning Restricted": "Respawning Restricted",
             "Mission Completed": "Mission",
@@ -178,7 +179,7 @@ class AutoSplitter:
             try:
                 ls_socket.send("getsplitindex\r\n".encode())
                 current_index = int(ls_socket.recv(1024).decode()[:-2])
-                print(self._split_index)
+                # print(self._split_index)
                 index_change = current_index != prev_index
                 if not self._auto_split and index_change:
                     # index 0 or -1 meaning it just started or ended
@@ -191,7 +192,8 @@ class AutoSplitter:
                         print(current_index)
                         self._next_split = False
                     else:
-                        # self._split_index += 1
+                        while self._split_list[self._split_index].dummy:
+                            self._split_index += 1
                         print(current_index)
                         self._next_split = False
                 else:
@@ -213,7 +215,7 @@ class ScreenChecker:
         # box that checks respawn restricted
         self._restricted_box = {"top": 460, "left": 840, "width": 240, "height": 30}
         # new objective box
-        self._new_objective_box = {"top": 265, "left": 190, "width": 200, "height": 30}
+        self._new_objective_box = {"top": 265, "left": 190, "width": 260, "height": 30}
         # new objective box
         self._objective_complete_box = {"top": 265, "left": 155, "width": 260, "height": 30}
         # mission complete box
@@ -235,8 +237,53 @@ class ScreenChecker:
             "Wipe Screen": self._light_fading_box,
             "Joining Allies": self._joining_allies_box
         }
+
+        self.monitor_setup()
         self._sct = mss.mss()
         self._api = tesserocr.PyTessBaseAPI(lang="eng")
+
+    def monitor_setup(self):
+        monitors = get_monitors()
+        for monitor in monitors:
+            if monitor.is_primary:
+                main_monitor = monitor
+                break
+
+        width = main_monitor.width
+        height = main_monitor.height
+        x_modifier = width / 1920
+        y_modifier = height / 1080
+
+        # if not 1080p it will apply 1440p measurements
+        if width != 1920 and height != 1080:
+            print("1440P")
+            # these boxes are simply upscaled on higher resolution
+            enhance_list = [self._light_fading_box, self._restricted_box]
+            for box in enhance_list:
+                box["left"] = int(box["left"] * x_modifier)
+                box["top"] = int(box["top"] * y_modifier)
+                box["width"] = int(box["width"] * x_modifier)
+                box["height"] = int(box["height"] * y_modifier)
+            # new objective 1440p
+            self._new_objective_box = {"top": 350, "left": 250, "width": 266, "height": 40}
+            self._split_to_box_map["New Objective"] = self._new_objective_box
+            # boss hp 1440p
+            self._boss_hp_box = {"top": 1302, "left": 860, "width": 845, "height": 2}
+            self._split_to_box_map["Boss Spawn"] = self._boss_hp_box
+            self._split_to_box_map["Boss Dead"] = self._boss_hp_box
+            # boss name 1440p
+            self._boss_name_box = {"top": 1320, "left": 1000, "width": 620, "height": 25}
+            # joining allies 1440p
+            self._joining_allies_box = {"top": 1057, "left": 1078, "width": 186, "height": 37}
+            self._split_to_box_map["Joining Allies"] = self._joining_allies_box
+            # prompt 1440p
+            self._prompt_box = {"top": 1100, "left": 80, "width": 493, "height": 46}
+            # objective complete 1440p
+            self._objective_complete_box = {"top": 345, "left": 205, "width": 350, "height": 45}
+            self._split_to_box_map["Objective Completed"] = self._objective_complete_box
+            # mission complete 1440p
+            self._mission_complete_box = {"top": 100, "left": 255, "width": 880, "height": 93}
+            self._split_to_box_map["Mission Completed"] = self._mission_complete_box
 
     def take_screenshot(self, split: Split):
         # select screenshot area based on split
@@ -260,7 +307,6 @@ class ScreenChecker:
         # tesserocr implementation
         self._api.SetImage(img)
         text = self._api.GetUTF8Text().lower()
-
         target = split.split_text.lower()
         if target in text:
             return True
