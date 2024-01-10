@@ -10,6 +10,8 @@ import cv2
 import livesplit
 from customtkinter import ThemeManager
 from screeninfo import get_monitors
+import os
+import sys
 
 import gui
 
@@ -71,8 +73,11 @@ class AutoSplitter:
         return connected
 
     def start_auto_splitter(self):
-        split_thread = th.Thread(target=self._start_auto_splitter, daemon=True)
-        split_thread.start()
+        if len(self._split_list) > 0:
+            split_thread = th.Thread(target=self._start_auto_splitter, daemon=True)
+            split_thread.start()
+            return True
+        return False
 
     def stop_auto_splitter(self):
         self._is_running = False
@@ -80,6 +85,7 @@ class AutoSplitter:
         self.update_split_ui()
 
     def _start_auto_splitter(self):
+        self._screen_checker.init_sct()
         self._is_running = True
         count = 0
         total = 0
@@ -239,8 +245,11 @@ class ScreenChecker:
         }
 
         self.monitor_setup()
+        self._sct = None
+        self._api = tesserocr.PyTessBaseAPI(path=resource_path(""), lang="eng")
+
+    def init_sct(self):
         self._sct = mss.mss()
-        self._api = tesserocr.PyTessBaseAPI(lang="eng")
 
     def monitor_setup(self):
         monitors = get_monitors()
@@ -369,3 +378,12 @@ class ScreenChecker:
         else:
             check = counter < 1 and all_ratio[0] > 0.99
         return check
+
+
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)

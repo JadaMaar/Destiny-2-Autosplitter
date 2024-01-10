@@ -104,8 +104,9 @@ def option_menu_callback(choice):
 def start_auto_splitter(splits):
     print(start.cget("fg_color"))
     auto_splitter.stop_auto_splitter()
-    auto_splitter.start_auto_splitter()
-    start.configure(fg_color="green")
+    started = auto_splitter.start_auto_splitter()
+    if started:
+        start.configure(fg_color="green")
 
 
 def stop_auto_splitter():
