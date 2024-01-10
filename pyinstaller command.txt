@@ -1,3 +1,0 @@
-pyinstaller -F main.py --collect-all customtkinter --collect-all tesserocr --onedir --windowed
-pyinstaller -F main.py --collect-all customtkinter --onefile --windowed
-C:\Users\Yonas\AppData\Local\Programs\Python\Python38-32\python.exe -m PyInstaller -F main.py --collect-all customtkinter --onefile --windowed
